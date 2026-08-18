@@ -3,7 +3,7 @@
 """
 AI 3자 실시간 끝장 토론 & 종합 판정 웹 애플리케이션
 Google Gemini, Anthropic Claude, OpenAI ChatGPT 페르소나 협업 토론 플랫폼
-클라우드(Streamlit Cloud) 및 모바일 완벽 호환 버전
+보안 비밀번호 인증 잠금 (Password: 1909) + 클라우드 및 모바일 완벽 호환
 """
 
 import os
@@ -27,14 +27,11 @@ except ImportError:
 
 # Streamlit secrets 및 환경 변수 통합 조회 헬퍼
 def get_api_key(key_name: str, fallback_key_name: str = None) -> str:
-    # 1. 세션 상태 사용자 입력
-    if f"custom_{key_name}" in st.session_state and st.session_state[f"custom_{key_name}"]:
-        return st.session_state[f"custom_{key_name}"].strip()
-    # 2. 로컬 환경 변수 (.env)
+    # 1. 로컬 환경 변수 (.env)
     env_val = os.getenv(key_name) or (os.getenv(fallback_key_name) if fallback_key_name else None)
     if env_val and "your_" not in env_val:
         return env_val.strip()
-    # 3. Streamlit Cloud Secrets
+    # 2. Streamlit Cloud Secrets
     try:
         if key_name in st.secrets:
             return str(st.secrets[key_name]).strip()
@@ -47,7 +44,7 @@ def get_api_key(key_name: str, fallback_key_name: str = None) -> str:
 
 # 페이지 설정
 st.set_page_config(
-    page_title="AI 3자 실시간 끝장 토론 & 종합 판정실",
+    page_title="AI 3자 실시간 끝장 토론실",
     page_icon="🎙️",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -109,29 +106,55 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # 세션 상태 초기화
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
 if "current_topic" not in st.session_state:
     st.session_state.current_topic = ""
 if "debate_history" not in st.session_state:
     st.session_state.debate_history = None
 
+
+# 🔐 비밀번호 인증 게이트
+AUTH_PASSWORD = "1909"
+
+if not st.session_state.authenticated:
+    st.markdown('<div class="main-header">🔒 AI 3자 토론실 보안 인증</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">본 시스템은 인가된 사용자만 접근할 수 있습니다. 비밀번호를 입력해주세요.</div>', unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        with st.form("auth_form"):
+            password_input = st.text_input("🔑 접속 비밀번호", type="password", placeholder="비밀번호 4자리를 입력하세요")
+            auth_submit = st.form_submit_button("🔓 토론실 입장하기")
+
+            if auth_submit:
+                if password_input == AUTH_PASSWORD:
+                    st.session_state.authenticated = True
+                    st.success("✔ 인증에 성공했습니다! 토론실로 입장합니다...")
+                    st.rerun()
+                else:
+                    st.error("❌ 비밀번호가 올바르지 않습니다. 다시 입력해주세요.")
+    st.stop()
+
+
+# --- 인증 완료 후 메인 서비스 화면 ---
+
 # 사이드바
 with st.sidebar:
-    st.header("🔑 API 키 연동 관리")
-    st.caption("로컬 `.env`, 클라우드 `secrets` 또는 아래 직접 입력창에서 키를 로드합니다.")
-
-    current_gemini = get_api_key("GOOGLE_API_KEY", "GEMINI_API_KEY")
-
-    with st.expander("⚙️ API 키 직접 확인 / 변경", expanded=not bool(current_gemini)):
-        input_gemini = st.text_input("Google Gemini API Key", value=current_gemini, type="password", key="custom_GOOGLE_API_KEY")
-
-    st.markdown("### 📡 실시간 연동 상태")
-    st.write(f"🟢 **Google Gemini Engine:** {'✅ 연결 완료' if input_gemini else '❌ 미연결'}")
-    st.write("🔴 **Claude (Red Team):** ⚡ 가동 준비 완료")
-    st.write("🔵 **ChatGPT (Moderator):** ⚡ 가동 준비 완료")
+    st.header("👤 사용자 인증 완료")
+    st.success("🟢 로그인 상태: **인증됨 (1909)**")
+    
+    if st.button("🔒 로그아웃"):
+        st.session_state.authenticated = False
+        st.session_state.debate_history = None
+        st.rerun()
 
     st.markdown("---")
-    st.subheader("💡 100% 무료 클라우드 모드")
-    st.success("Google Gemini 고속 AI 엔진을 바탕으로 3자 끝장 토론과 종합 판정서가 완전 무료로 작동합니다.")
+    st.subheader("💡 활용 팁")
+    st.markdown("""
+    - 질문만 입력하고 **Enter**를 치면 실시간 3자 토론이 시작됩니다.
+    - 토론 대화록과 최종 판정서는 **.md 파일로 다운로드**할 수 있습니다.
+    """)
 
 
 # 메인 헤더
@@ -360,7 +383,7 @@ if submit_button:
     cur_g = get_api_key("GOOGLE_API_KEY", "GEMINI_API_KEY")
 
     if not cur_g:
-        st.error("⚠️ Google Gemini API 키가 필요합니다. 사이드바에서 키를 확인해주세요.")
+        st.error("⚠️ Google Gemini API 키가 필요합니다.")
     elif not topic_input.strip():
         st.warning("⚠️ 분석할 주제나 궁금한 점을 입력해주세요!")
     else:
